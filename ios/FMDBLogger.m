@@ -184,7 +184,9 @@
 
     if (logMessage && [logMessage->_message length] != 0) {
         FMDBLogEntry *logEntry = [[FMDBLogEntry alloc] initWithLogMessage:logMessage];
-        [pendingLogEntries addObject:logEntry];
+        @synchronized(pendingLogEntries) {
+            [pendingLogEntries addObject:logEntry];
+        }
     }
 
     // Return YES if an item was added to the buffer.
@@ -210,15 +212,22 @@
     }
 
     NSString *cmd = @"INSERT INTO logs (timestamp, level, message) VALUES (?, ?, ?)";
+    NSArray *logEntries = nil;
 
-    for (FMDBLogEntry *logEntry in pendingLogEntries)
-    {
-        [database executeUpdate:cmd, [NSNumber numberWithDouble:floor([logEntry->timestamp timeIntervalSince1970] * 1000)],
-                                     [self convertToDbLogLevel:logEntry->level],
-                                     logEntry->message];
+    @synchronized(pendingLogEntries) {
+        logEntries = [pendingLogEntries copy];
     }
 
-    [pendingLogEntries removeAllObjects];
+    for (FMDBLogEntry *logEntry in logEntries)
+    {
+        [database executeUpdate:cmd, [NSNumber numberWithDouble:floor([logEntry->timestamp timeIntervalSince1970] * 1000)],
+                                    [self convertToDbLogLevel:logEntry->level],
+                                    logEntry->message];
+    }
+
+    @synchronized(pendingLogEntries) {
+        [pendingLogEntries removeObjectsInRange:NSMakeRange(0, [logEntries count])];
+    }
 
     if (saveOnlyTransaction)
     {
