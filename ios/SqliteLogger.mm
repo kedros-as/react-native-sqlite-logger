@@ -26,10 +26,12 @@ RCT_EXPORT_METHOD(configure:(NSDictionary*)options resolver:(RCTPromiseResolveBl
     NSString *logFileDir = options[@"logFileDir"] ? : [self getSQLiteDirectoryPath];
     NSString *logFileName = options[@"logFileName"] ? : @"log.sqlite";
     NSNumber *maxAge = options[@"maxAge"] ? : @(60 * 60 * 24 * 5); // default 5 days
+    NSNumber *queueSize = options[@"queueSize"] ? : @(500); // default 500 items
+    NSNumber *saveInterval = options[@"saveInterval"] ? : @(10); // default 10 seconds
     FMDBLogger *sqliteLogger = [[FMDBLogger alloc] initWithLogDirectory:logFileDir logFileName:logFileName];
 
-    sqliteLogger.saveThreshold     = 500;
-    sqliteLogger.saveInterval      = 60;
+    sqliteLogger.saveThreshold     = [queueSize doubleValue];
+    sqliteLogger.saveInterval      = [saveInterval doubleValue];
     sqliteLogger.maxAge            = [maxAge doubleValue];
     sqliteLogger.deleteInterval    = [deleteInterval doubleValue];
     sqliteLogger.deleteOnEverySave = NO;
