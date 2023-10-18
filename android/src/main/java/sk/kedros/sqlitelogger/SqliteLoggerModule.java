@@ -95,10 +95,14 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
         }
         if (maxFlushTime != null) {
           asyncAppender.setMaxFlushTime(maxFlushTime);
+        } else {
+          asyncAppender.setMaxFlushTime(0);
         }
         asyncAppender.setContext(loggerContext);
         asyncAppender.setName("ASYNC");
         asyncAppender.addAppender(sqLiteAppender);
+        asyncAppender.setDiscardingThreshold(0);
+        asyncAppender.setIncludeCallerData(false);
         asyncAppender.start();
         appender = asyncAppender;
       } else {
