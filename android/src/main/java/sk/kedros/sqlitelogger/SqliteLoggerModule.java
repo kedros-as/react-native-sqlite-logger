@@ -1,11 +1,8 @@
 package sk.kedros.sqlitelogger;
 
+import android.os.Build;
+
 import androidx.annotation.NonNull;
-
-import android.content.Intent;
-import android.net.Uri;
-
-import androidx.core.content.FileProvider;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
@@ -22,9 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FilenameFilter;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,6 +31,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import sk.kedros.sqlitelogger.common.LogEvent;
 import sk.kedros.sqlitelogger.common.LogLevel;
 import sk.kedros.sqlitelogger.db.SQLiteAppender;
+
+import android.util.Log;
 
 @ReactModule(name = SqliteLoggerModule.NAME)
 public class SqliteLoggerModule extends ReactContextBaseJavaModule {
@@ -55,6 +51,19 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
 
   private SQLiteAppender sqLiteAppender;
   private AsyncAppender asyncAppender;
+
+  private boolean isCompressionExtensionAvailable() {
+    for (String abi: Build.SUPPORTED_ABIS) {
+      switch (abi) {
+        case "arm64-v8a":
+        case "x86_64":
+        case "x86":
+        case "armeabi-v7a":
+          return true;
+      }
+    }
+    return false;
+  }
 
   @Override
   @NonNull
@@ -77,6 +86,7 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
       Boolean async = options.hasKey("async") ? options.getBoolean("async") : Boolean.TRUE;
       Integer queueSize = options.hasKey("queueSize") ? (int) options.getDouble("queueSize") : null;
       Integer maxFlushTime = options.hasKey("maxFlushTime") ? (int) options.getDouble("maxFlushTime") : null;
+      Boolean useCompression = options.hasKey("useCompression") ? options.getBoolean("useCompression") : Boolean.FALSE;
 
       sqLiteAppender = new SQLiteAppender();
       sqLiteAppender.setContext(loggerContext);
@@ -85,6 +95,7 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
       sqLiteAppender.setMaxAge(maxAge);
       sqLiteAppender.setName("SQLITE");
       sqLiteAppender.setDeleteInterval(deleteInterval);
+      sqLiteAppender.setUseCompression(useCompression && isCompressionExtensionAvailable());
       sqLiteAppender.start();
 
       Appender<ILoggingEvent> appender;
@@ -163,16 +174,6 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
     Exception error = null;
 
     try {
-      if (sqLiteAppender != null) {
-        sqLiteAppender.stop();
-      }
-    } catch (Exception e) {
-      error = e;
-    } finally {
-      sqLiteAppender = null;
-    }
-
-    try {
       if (asyncAppender != null) {
         asyncAppender.stop();
       }
@@ -180,6 +181,16 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
       error = e;
     } finally {
       asyncAppender = null;
+    }
+
+    try {
+      if (sqLiteAppender != null) {
+        sqLiteAppender.stop();
+      }
+    } catch (Exception e) {
+      error = e;
+    } finally {
+      sqLiteAppender = null;
     }
 
     if (error != null) {
@@ -242,6 +253,32 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
       try {
         File dbFile = this.sqLiteAppender.getLogStorage().getDbFile();
         promise.resolve(dbFile == null ? null : dbFile.getAbsolutePath());
+      } catch (Throwable t) {
+        promise.reject(t);
+      }
+    });
+  }
+
+  @ReactMethod
+  public void cleanUp(ReadableMap options, Promise promise) {
+
+    if (sqLiteAppender == null) {
+      promise.resolve(null);
+      return;
+    }
+
+    Boolean compress = this.sqLiteAppender.isUseCompression() && options.hasKey("compress") ? options.getBoolean("compress") : Boolean.TRUE;
+    Boolean vacuum = options.hasKey("vacuum") ? options.getBoolean("vacuum") : Boolean.FALSE;
+
+    if (!compress && !vacuum) {
+      promise.resolve(null);
+      return;
+    }
+
+    executeAsyncTask(promise, () -> {
+      try {
+        this.sqLiteAppender.getLogStorage().cleanUp(compress, vacuum);
+        promise.resolve(null);
       } catch (Throwable t) {
         promise.reject(t);
       }

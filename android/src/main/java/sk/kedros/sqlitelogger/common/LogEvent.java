@@ -1,6 +1,5 @@
 package sk.kedros.sqlitelogger.common;
 
-import ch.qos.logback.classic.Level;
 import java.io.Serializable;
 
 public class LogEvent implements Serializable {

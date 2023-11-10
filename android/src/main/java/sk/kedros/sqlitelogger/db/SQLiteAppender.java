@@ -1,23 +1,7 @@
 package sk.kedros.sqlitelogger.db;
 
-import java.io.File;
-import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
-import android.database.sqlite.SQLiteStatement;
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.IThrowableProxy;
-import ch.qos.logback.classic.spi.StackTraceElementProxy;
-import ch.qos.logback.classic.spi.ThrowableProxyUtil;
-import ch.qos.logback.core.CoreConstants;
 import ch.qos.logback.core.UnsynchronizedAppenderBase;
-import ch.qos.logback.core.android.AndroidContextUtil;
-import ch.qos.logback.core.util.Duration;
 import sk.kedros.sqlitelogger.common.LogLevel;
 
 public class SQLiteAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
@@ -31,6 +15,7 @@ public class SQLiteAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
   private long maxAge;
   private long lastCleanupTime = 0;
   private long deleteInterval;
+  private boolean useCompression;
 
   public String getLogFileDir() {
     return logFileDir;
@@ -64,6 +49,14 @@ public class SQLiteAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
     this.deleteInterval = (deleteInterval == null ? DEFAULT_DELETE_INTERVAL : deleteInterval) * 1000;
   }
 
+  public boolean isUseCompression() {
+    return useCompression;
+  }
+
+  public void setUseCompression(boolean useCompression) {
+    this.useCompression = useCompression;
+  }
+
   /*
    * (non-Javadoc)
    * @see ch.qos.logback.core.UnsynchronizedAppenderBase#start()
@@ -75,7 +68,7 @@ public class SQLiteAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
       if (logStorage != null) {
         logStorage.close();
       }
-      logStorage = new SQLiteLogStorage(this.logFileDir, this.logFileName);
+      logStorage = new SQLiteLogStorage(this.logFileDir, this.logFileName, this.useCompression);
       clearExpiredLogs();
       super.start();
     } catch (Exception e) {

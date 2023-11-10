@@ -1,24 +1,25 @@
 package sk.kedros.sqlitelogger.db;
 
 import java.io.File;
-import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
-import android.database.sqlite.SQLiteStatement;
+import io.requery.android.database.sqlite.SQLiteCustomExtension;
+import io.requery.android.database.sqlite.SQLiteDatabaseConfiguration;
+import io.requery.android.database.sqlite.SQLiteDatabase;
+import io.requery.android.database.sqlite.SQLiteStatement;
 import ch.qos.logback.core.android.AndroidContextUtil;
 import sk.kedros.sqlitelogger.common.LogEvent;
 import sk.kedros.sqlitelogger.common.LogLevel;
 import sk.kedros.sqlitelogger.common.SortOrder;
+import android.util.Log;
 
 public class SQLiteLogStorage {
+
+  private static final String TAG = "SQLiteLog";
 
   private static final int GET_LOGS_ID_INDEX = 0;
   private static final int GET_LOGS_TIMESTAMP_INDEX = 1;
@@ -30,10 +31,12 @@ public class SQLiteLogStorage {
 
   private final SQLiteDatabase db;
   private final File dbFile;
+  private final boolean useCompression;
 
-  public SQLiteLogStorage(String logFileDir, String logFileName) {
+  public SQLiteLogStorage(String logFileDir, String logFileName, boolean useCompression) {
 
     this.dbFile = getDatabaseFile(logFileDir, logFileName);
+    this.useCompression = useCompression;
 
     if (dbFile == null) {
       throw new IllegalArgumentException("Cannot determine database filename");
@@ -41,16 +44,75 @@ public class SQLiteLogStorage {
 
     try {
       dbFile.getParentFile().mkdirs();
-      this.db = SQLiteDatabase.openOrCreateDatabase(dbFile.getPath(), null);
-    } catch (SQLiteException e) {
-      throw new IllegalArgumentException("Cannot open database", e);
+      this.db = openDatabase();
+    } catch (Exception e) {
+      close();
+      throw new RuntimeException("Cannot open database", e);
     }
 
     try {
-      this.db.execSQL(SQLQuery.CREATE_DB_TABLE);
+      setUpDatabase();
+    } catch (Exception e) {
+      close();
+      throw new RuntimeException("Cannot setUp database tables", e);
+    }
+  }
+
+  private SQLiteDatabase openDatabase() {
+
+    if (!useCompression) {
+      return SQLiteDatabase.openOrCreateDatabase(dbFile.getPath(), null);
+    }
+
+    SQLiteCustomExtension ext = new SQLiteCustomExtension("libsqlite_zstd.so", "sqlite3_sqlitezstd_init");
+
+    SQLiteDatabaseConfiguration conf = new SQLiteDatabaseConfiguration(
+      dbFile.getPath(),
+      SQLiteDatabase.CREATE_IF_NECESSARY,
+      Collections.emptyList(),
+      Collections.emptyList(),
+      Arrays.asList(ext)
+    );
+
+    return SQLiteDatabase.openDatabase(conf, null, null);
+  }
+
+  private void setUpCompression() {
+    try {
+      String query="SELECT zstd_enable_transparent('{\"table\": \"logs\", \"column\": \"message\", \"compression_level\": 19, \"dict_chooser\": \"''a''\"}')";
+      final Cursor result = db.rawQuery(query, null);
+      if (result == null || !result.moveToFirst()) {
+        throw new RuntimeException("SQLite compression: enable_transparent failed!");
+      }
+      result.close();
+    } catch (Exception e) {
+      Log.e(TAG, "Error compression setup", e);
+    }
+  }
+
+  private void setUpDatabase() {
+    this.db.execSQL(SQLQuery.CREATE_DB_TABLE);
+
+    if (useCompression) {
+      setUpCompression();
+    } else {
       this.db.execSQL(SQLQuery.CREATE_DB_INDEX);
-    } catch (SQLiteException e) {
-      throw new IllegalArgumentException("Cannot create database tables", e);
+    }
+  }
+
+  private void compress() {
+    if (!useCompression) {
+      return;
+    }
+
+    try {
+      final Cursor result = db.rawQuery("select zstd_incremental_maintenance(null, 1)", null);
+      if (result == null || !result.moveToFirst()) {
+        throw new RuntimeException("SQLite compression: incremental_maintenance failed!");
+      }
+      result.close();
+    } catch (Exception e) {
+      throw new RuntimeException("SQLite compression: incremental_maintenance exception!", e);
     }
   }
 
@@ -75,6 +137,16 @@ public class SQLiteLogStorage {
     return dbFile;
   }
 
+  public void cleanUp(boolean compress, boolean vacuum) {
+    if (compress && useCompression) {
+      compress();
+    }
+
+    if (vacuum) {
+      this.db.execSQL("VACUUM");
+    }
+  }
+
   public void close() {
     if (db != null) {
       db.close();
@@ -86,7 +158,7 @@ public class SQLiteLogStorage {
       return;
     }
 
-    SQLiteStatement stmt = db.compileStatement(SQLQuery.INSERT_EVENT);
+    SQLiteStatement stmt = db.compileStatement(useCompression ? SQLQuery.INSERT_EVENT_WITH_COMPRESSION : SQLQuery.INSERT_EVENT);
     stmt.bindLong(INSERT_LOG_TIMESTAMP_INDEX, timestamp);
     stmt.bindLong(INSERT_LOG_LEVEL_INDEX, level.getCode());
     stmt.bindString(INSERT_LOG_MESSAGE_INDEX, message);
@@ -188,7 +260,7 @@ public class SQLiteLogStorage {
     try {
       db.beginTransaction();
       int deletedRows = db.delete(
-        SQLQuery.TABLE_LOGS,
+        useCompression ? SQLQuery.TABLE_LOGS_WITH_COMPRESSION : SQLQuery.TABLE_LOGS,
         String.join(" AND ", where),
         whereArgs.toArray(new String[0])
       );

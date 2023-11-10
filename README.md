@@ -42,6 +42,16 @@ Initialize the sqlite-logger with the specified options. As soon as the returned
 | `logFileName`    | Name of the DB file where the logs are stored.                                                                                                                                        | `logs.sqlite`               |
 | `maxAge`         | Maximal age (in seconds) of the log messages. Messages older than `maxAge` could be automatically removed.                                                                            | `60 * 60 * 24 * 5` (5 days) |
 | `deleteInterval` | How often (in seconds) to delete old log messages. Value lower or equal to zero means that logs won't be deleted.                                                                     | `60 * 5` (5 minutes)        |
+| `useCompression` | If supported in the current platform, prepare DB to allow message compression. This operation is not reversible.                                                                      | `false`                     |
+
+#### SQLiteLogger.cleanUp(options): Promise<void>
+
+Clean up DB according to the options.
+
+| Option     | Description                                                                           | Default |
+|------------|---------------------------------------------------------------------------------------|---------|
+| `compress` | Compress rows that are not compressed yet. Noop for DB with `useCompression = false`. | true    |
+| `vacuum`   | Remove unused space from the DB file.                                                 | false   |
 
 #### SQLiteLogger.deleteLogs(options): Promise<void>
 
@@ -112,6 +122,10 @@ Shortcut for `SQLiteLogger.write(LogLevel.Error, msg)`.
 ### SQLiteLogger.write(level, msg)
 
 Append the given message into the DB with the specified log level. The message will be formatted with the `formatter` function specified during the `SQLiteLogger.configure()` call.
+
+## Compression
+
+SQLite's extension [sqlite-zstd](https://github.com/phiresky/sqlite-zstd) is used for message compression. Extension was build from commit 6e058289e2898d3d23c975d471d581e6bab83d19.
 
 ## Troubleshooting
 

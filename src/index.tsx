@@ -64,6 +64,10 @@ export interface ConfigureOptions {
    * Maximal age of the logs to preserve in seconds.
    **/
   maxAge?: number;
+  /**
+   * Compress messages.
+   **/
+  useCompression?: boolean;
 }
 
 class SQLiteLoggerImpl {
@@ -79,6 +83,7 @@ class SQLiteLoggerImpl {
       logLevel = LogLevel.Debug,
       maxAge,
       deleteInterval,
+      useCompression = false,
     } = options;
 
     await RNSqliteLogger.configure({
@@ -86,6 +91,7 @@ class SQLiteLoggerImpl {
       logFileDir,
       logFileName,
       maxAge,
+      useCompression,
     });
 
     this._logLevel = logLevel;
@@ -114,6 +120,13 @@ class SQLiteLoggerImpl {
 
   getLogLevel(): LogLevel {
     return this._logLevel;
+  }
+
+  cleanUp(options: {
+    compress?: boolean;
+    vacuum?: boolean;
+  }): Promise<LogEvent[]> {
+    return RNSqliteLogger.cleanUp(options);
   }
 
   getLogs(options: {
