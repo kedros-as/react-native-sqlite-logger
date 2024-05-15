@@ -382,7 +382,7 @@ PODS:
   - React-logger (0.72.3):
     - glog
   - react-native-sqlite-logger (0.1.0):
-    - CocoaLumberjack (~> 3.7.2)
+    - CocoaLumberjack (~> 3.8.5)
     - FMDB (~> 2.7.5)
     - RCT-Folly (= 2021.07.22.00)
     - React-Core

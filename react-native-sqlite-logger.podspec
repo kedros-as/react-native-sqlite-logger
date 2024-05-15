@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
 
   s.source_files = "ios/**/*.{h,c,m,mm,swift}"
 
-  s.dependency 'CocoaLumberjack', '~> 3.7.2'
+  s.dependency 'CocoaLumberjack', '~> 3.8.5'
   s.dependency 'FMDB', '~> 2.7.5'
 
   # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
@@ -40,5 +40,5 @@ Pod::Spec.new do |s|
     s.dependency "RCTTypeSafety"
     s.dependency "ReactCommon/turbomodule/core"
    end
-  end    
+  end
 end
