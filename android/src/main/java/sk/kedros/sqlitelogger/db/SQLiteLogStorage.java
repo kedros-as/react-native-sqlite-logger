@@ -104,7 +104,7 @@ public class SQLiteLogStorage {
       stmt.close();
     }
   }
-  public List<LogEvent> getLogs(Long start, Long end, Integer limit, Integer level, String order) {
+  public List<LogEvent> getLogs(Long start, Long end, Integer limit, Integer level, String order, Integer explicitLevel) {
 
     List<LogEvent> resultList = new ArrayList<>();
 
@@ -126,7 +126,11 @@ public class SQLiteLogStorage {
       }
 
       if (level != null) {
-        selection.add(SQLQuery.SELECTION_LEVEL_EQ);
+        if (explicitLevel == 1) {
+            selection.add(SQLQuery.SELECTION_LEVEL_EQ);
+        } else {
+            selection.add(SQLQuery.SELECTION_LEVEL_GTE);
+        }     
         selectionArgs.add(String.valueOf(level));
       }
 

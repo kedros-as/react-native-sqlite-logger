@@ -350,7 +350,7 @@
     return success;
 }
 
-- (NSArray*)getLogs:(NSNumber*)start end:(NSNumber*)end level:(NSNumber*)level limit:(NSNumber*)limit order:(NSString*)order;
+- (NSArray*)getLogs:(NSNumber*)start end:(NSNumber*)end level:(NSNumber*)level limit:(NSNumber*)limit order:(NSString*)order explicitLevel:(NSNumber*)explicitLevel;
 {
 
     [self db_save];
@@ -369,7 +369,11 @@
     }
 
     if (level) {
-        [whereArray addObject:@"level = ?"];
+        if (explicitLevel) {
+            [whereArray addObject:@"level = ?"];
+        } else {
+            [whereArray addObject:@"level >= ?"];
+        }
         [args addObject:level];
     }
 

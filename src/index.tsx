@@ -168,8 +168,12 @@ class SQLiteLoggerImpl {
     level?: LogLevel;
     limit?: number;
     order?: 'asc' | 'desc';
+    explicitLevel?: boolean;
   }): Promise<LogEvent[]> {
-    return RNSqliteLogger.getLogs(options);
+    return RNSqliteLogger.getLogs({
+      ...options,
+      explicitLevel: options.explicitLevel ? 1 : 0
+    });
   }
 
   deleteLogs(options: {

@@ -26,6 +26,7 @@ abstract class SQLQuery {
 
   public static final String SELECTION_ID_LTE = "log_id <= ?";
   public static final String SELECTION_LEVEL_EQ = "level = ?";
+  public static final String SELECTION_LEVEL_GTE = "level >= ?";
   public static final String SELECTION_TIMESTAMP_GTE = "timestamp >= ?";
   public static final String SELECTION_TIMESTAMP_LTE = "timestamp <= ?";
 
