@@ -207,7 +207,8 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
         Integer limit = options.hasKey("limit") ? options.getInt("limit") : null;
         Integer level = options.hasKey("level") ? options.getInt("level") : null;
         String order = options.hasKey("order") ? options.getString("order") : null;
-        List<LogEvent> logs = this.sqLiteAppender.getLogStorage().getLogs(start, end, limit, level, order);
+        Integer explicitLevel = options.hasKey("explicitLevel") ? options.getInt("explicitLevel") : 1;
+        List<LogEvent> logs = this.sqLiteAppender.getLogStorage().getLogs(start, end, limit, level, order, explicitLevel);
 
         WritableArray result = Arguments.createArray();
         for (LogEvent log : logs) {

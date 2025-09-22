@@ -69,8 +69,9 @@ RCT_EXPORT_METHOD(getLogs:(NSDictionary*)options resolver:(RCTPromiseResolveBloc
     NSNumber* level = options[@"level"];
     NSNumber* limit = options[@"limit"];
     NSString* order = options[@"order"];
+    NSNumber* explicitLevel = options[@"explicitLevel"]
 
-    NSArray* result = [self.sqliteLogger getLogs:start end:end level:level limit:limit order:order];
+    NSArray* result = [self.sqliteLogger getLogs:start end:end level:level limit:limit order:order explicitLevel:explicitLevel];
     resolve(result);
 }
 
