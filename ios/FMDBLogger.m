@@ -20,6 +20,7 @@
     NSNumber * level;
     NSString * message;
     NSDate   * timestamp;
+    NSString * tag;
 }
 
 - (id)initWithLogMessage:(DDLogMessage *)logMessage;
@@ -39,6 +40,7 @@
         level     = @(logMessage->_flag);
         message   = logMessage->_message;
         timestamp = logMessage->_timestamp;
+        tag       = logMessage->_representedObject;
     }
     return self;
 }
@@ -111,50 +113,110 @@
 
 - (void)openDatabase
 {
-    if (_logDirectory == nil)
-    {
-        return;
+  if (_logDirectory == nil)
+  {
+    return;
+  }
+  
+  NSString *path = [self getDbFilePath];
+  
+  database = [[FMDatabase alloc] initWithPath:path];
+  
+  if (![database open])
+  {
+    NSLog(@"%@: Failed opening database!", [self class]);
+    database = nil;
+    return;
+  }
+  
+  NSString *verCheckQuery = @"PRAGMA user_version;";
+  
+  int userVer = 0;
+  FMResultSet *resultSet = [database executeQuery:verCheckQuery];
+  if ([database hadError])
+  {
+    NSLog(@"%@: Error checking schema version: code(%d): %@",
+          [self class], [database lastErrorCode], [database lastErrorMessage]);
+    
+    database = nil;
+  } else {
+    while ([resultSet next]) {
+      userVer = [resultSet intForColumn:@"user_version"];
+      break;
     }
-
-    NSString *path = [self getDbFilePath];
-
-    database = [[FMDatabase alloc] initWithPath:path];
-
-    if (![database open])
-    {
-        NSLog(@"%@: Failed opening database!", [self class]);
-
-        database = nil;
-
-        return;
-    }
-
+  }
+  
+  if (userVer == 0) {
+    NSLog(@"Creating initial db schema");
+    
     NSString *cmd1 = @"CREATE TABLE IF NOT EXISTS logs (log_id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                                       "timestamp INTEGER, "
-                                                       "level TINYINT, "
-                                                       "message TEXT)";
-
+    "timestamp INTEGER, "
+    "level TINYINT, "
+    "message TEXT)";
+    
     [database executeUpdate:cmd1];
     if ([database hadError])
     {
-        NSLog(@"%@: Error creating table: code(%d): %@",
-              [self class], [database lastErrorCode], [database lastErrorMessage]);
-
-        database = nil;
+      NSLog(@"%@: Error creating table: code(%d): %@",
+            [self class], [database lastErrorCode], [database lastErrorMessage]);
+      database = nil;
     }
-
+    
     NSString *cmd2 = @"CREATE INDEX IF NOT EXISTS i_log_timestamp ON logs (timestamp)";
-
+    
     [database executeUpdate:cmd2];
     if ([database hadError])
     {
-        NSLog(@"%@: Error creating index: code(%d): %@",
-              [self class], [database lastErrorCode], [database lastErrorMessage]);
-
-        database = nil;
+      NSLog(@"%@: Error creating index: code(%d): %@",
+            [self class], [database lastErrorCode], [database lastErrorMessage]);
+      database = nil;
     }
-
-    [database setShouldCacheStatements:YES];
+    
+    NSString *cmd3 = @"PRAGMA user_version = 1;";
+    [database executeUpdate:cmd3];
+    if ([database hadError]) {
+      NSLog(@"%@: Error updating user_version to 1: code(%d): %@",
+            [self class], [database lastErrorCode], [database lastErrorMessage]);
+      database = nil;
+    } else {
+      userVer = 1;
+    }
+  }
+  
+  if (userVer == 1) {
+    NSLog(@"Upgrading db schema to v2");
+    NSString *cmd1 = @"ALTER TABLE logs ADD COLUMN tag TEXT;";
+    NSString *cmd2 = @"CREATE INDEX IF NOT EXISTS i_log_tag ON logs (tag);";
+    NSString *cmd3 = @"PRAGMA user_version = 2;";
+    
+    [database executeUpdate:cmd1];
+    if ([database hadError])
+    {
+      NSLog(@"%@: Error adding column tag to table: code(%d): %@",
+            [self class], [database lastErrorCode], [database lastErrorMessage]);
+      database = nil;
+    }
+    
+    [database executeUpdate:cmd2];
+    if ([database hadError])
+    {
+      NSLog(@"%@: Error creating index i_log_tag: code(%d): %@",
+            [self class], [database lastErrorCode], [database lastErrorMessage]);
+      database = nil;
+    }
+    
+    [database executeUpdate:cmd3];
+    if ([database hadError])
+    {
+      NSLog(@"%@: Error updating user_version to 2: code(%d): %@",
+            [self class], [database lastErrorCode], [database lastErrorMessage]);
+      database = nil;
+    } else {
+      userVer = 2;
+    }
+  }
+  
+  [database setShouldCacheStatements:YES];
 }
 
 #pragma mark AbstractDatabaseLogger Overrides
@@ -211,7 +273,7 @@
         [database beginTransaction];
     }
 
-    NSString *cmd = @"INSERT INTO logs (timestamp, level, message) VALUES (?, ?, ?)";
+    NSString *cmd = @"INSERT INTO logs (timestamp, level, message, tag) VALUES (?, ?, ?, ?)";
 
     @synchronized(pendingLogEntries) {
 
@@ -219,7 +281,8 @@
         {
             [database executeUpdate:cmd, [NSNumber numberWithDouble:floor([logEntry->timestamp timeIntervalSince1970] * 1000)],
                                         [self convertToDbLogLevel:logEntry->level],
-                                        logEntry->message];
+                                        logEntry->message,
+                                        logEntry->tag];
         }
 
         [pendingLogEntries removeAllObjects];
@@ -350,7 +413,7 @@
     return success;
 }
 
-- (NSArray*)getLogs:(NSNumber*)start end:(NSNumber*)end level:(NSNumber*)level limit:(NSNumber*)limit order:(NSString*)order explicitLevel:(NSNumber*)explicitLevel;
+- (NSArray*)getLogs:(NSNumber*)start end:(NSNumber*)end level:(NSNumber*)level tags:(NSArray*)tags limit:(NSNumber*)limit order:(NSString*)order explicitLevel:(NSNumber*)explicitLevel;
 {
 
     [self db_save];
@@ -377,6 +440,15 @@
         [args addObject:level];
     }
 
+    if (tags != nil && [tags count] != 0) {
+        NSMutableArray *quoted = [NSMutableArray arrayWithCapacity:tags.count];
+        for (NSString *s in tags) {
+            [quoted addObject:[NSString stringWithFormat:@"'%@'", s]];
+        }
+        NSString *tagStr = [[NSString alloc] initWithFormat:@"tag in (%@)",[quoted componentsJoinedByString:@","]];
+        [whereArray addObject:tagStr];
+    }
+
     NSString *whereClause = [whereArray count] == 0 ? @"" : [NSString stringWithFormat:@" WHERE %@", [whereArray componentsJoinedByString:@" AND "]];
     NSString *orderClause = order && [order compare:@"desc" options: NSCaseInsensitiveSearch] == NSOrderedSame ? @" ORDER BY timestamp DESC" : @" ORDER BY timestamp ASC";
     NSString *limitClause = limit ? [NSString stringWithFormat:@" LIMIT %@", limit] : @"";
@@ -392,13 +464,16 @@
         NSNumber *timestamp = [resultSet objectForColumn:@"timestamp"];
         NSNumber *level = [resultSet objectForColumn:@"level"];
         NSString *message = [resultSet stringForColumn:@"message"];
+        NSString *tag = [resultSet stringForColumn:@"tag"];
 
-        NSDictionary *row = @{
+        NSMutableDictionary *row = [@{
                 @"id": logId,
                 @"timestamp": timestamp,
                 @"level": level,
                 @"message": message
-        };
+        } mutableCopy];
+      
+        [row setValue:tag forKey:@"tag"]; // tag might be nil
 
         [resultList addObject:row];
     }

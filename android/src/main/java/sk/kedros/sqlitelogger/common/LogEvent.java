@@ -1,6 +1,5 @@
 package sk.kedros.sqlitelogger.common;
 
-import ch.qos.logback.classic.Level;
 import java.io.Serializable;
 
 public class LogEvent implements Serializable {
@@ -9,12 +8,18 @@ public class LogEvent implements Serializable {
   private final Long timestamp;
   private final LogLevel level;
   private final String message;
+  private final String tag;
 
   public LogEvent(Long id, Long timestamp, LogLevel level, String message) {
+    this(id, timestamp, level, message, null);
+  }
+
+  public LogEvent(Long id, Long timestamp, LogLevel level, String message, String tag) {
     this.id = id;
     this.timestamp = timestamp;
     this.level = level;
     this.message = message;
+    this.tag = tag;
   }
 
   public Long getId() {
@@ -32,4 +37,9 @@ public class LogEvent implements Serializable {
   public String getMessage() {
     return message;
   }
+
+  public String getTag() {
+    return tag;
+  }
+
 }

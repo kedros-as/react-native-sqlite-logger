@@ -145,7 +145,8 @@ public class SQLiteAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
       logStorage.insertLog(
         event.getTimeStamp(),
         LogLevel.fromLogbackLevel(event.getLevel()),
-        event.getFormattedMessage()
+        event.getFormattedMessage(),
+        event.getLoggerName()
       );
     } catch (Throwable e) {
       addError("Cannot append event", e);

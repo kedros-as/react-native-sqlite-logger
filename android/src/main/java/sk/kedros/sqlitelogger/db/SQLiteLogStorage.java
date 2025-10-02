@@ -8,11 +8,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteStatement;
+import android.util.Log;
+
 import ch.qos.logback.core.android.AndroidContextUtil;
 import sk.kedros.sqlitelogger.common.LogEvent;
 import sk.kedros.sqlitelogger.common.LogLevel;
@@ -20,13 +23,17 @@ import sk.kedros.sqlitelogger.common.SortOrder;
 
 public class SQLiteLogStorage {
 
+  private static final String TAG = "SQLiteLogStorage";
+
   private static final int GET_LOGS_ID_INDEX = 0;
   private static final int GET_LOGS_TIMESTAMP_INDEX = 1;
   private static final int GET_LOGS_LEVEL_INDEX = 2;
   private static final int GET_LOGS_MESSAGE_INDEX  = 3;
+  private static final int GET_LOGS_TAG_INDEX  = 4;
   private static final int INSERT_LOG_TIMESTAMP_INDEX = 1;
   private static final int INSERT_LOG_LEVEL_INDEX = 2;
   private static final int INSERT_LOG_MESSAGE_INDEX  = 3;
+  private static final int INSERT_LOG_TAG_INDEX  = 4;
 
   private final SQLiteDatabase db;
   private final File dbFile;
@@ -46,11 +53,35 @@ public class SQLiteLogStorage {
       throw new IllegalArgumentException("Cannot open database", e);
     }
 
-    try {
-      this.db.execSQL(SQLQuery.CREATE_DB_TABLE);
-      this.db.execSQL(SQLQuery.CREATE_DB_INDEX);
-    } catch (SQLiteException e) {
-      throw new IllegalArgumentException("Cannot create database tables", e);
+    createOrUpgradeSchema();
+  }
+
+  private void createOrUpgradeSchema() {
+    int currentVersion = this.db.getVersion();
+    Log.d(TAG, "createOrUpgradeSchema version:" + currentVersion);
+    if (currentVersion == 0) {
+      // initial schema create
+      try {
+        this.db.execSQL(SQLQuery.CREATE_DB_TABLE);
+        this.db.execSQL(SQLQuery.CREATE_DB_INDEX);
+        this.db.setVersion(1);
+        currentVersion = 1;
+        Log.d(TAG, "createOrUpgradeSchema created initial schema.");
+      } catch (SQLiteException e) {
+        throw new IllegalArgumentException("Cannot create database initial tables", e);
+      }
+    }
+
+    if (currentVersion == 1) {
+      try {
+        this.db.execSQL("ALTER TABLE logs ADD COLUMN tag TEXT;");
+        this.db.execSQL("CREATE INDEX IF NOT EXISTS i_log_tag ON logs (tag);");
+        this.db.setVersion(2);
+        currentVersion = 2;
+        Log.d(TAG, "createOrUpgradeSchema upgraded schema to v2.");
+      } catch (SQLiteException e) {
+        throw new IllegalArgumentException("Cannot upgrade database to v2", e);
+      }
     }
   }
 
@@ -80,7 +111,12 @@ public class SQLiteLogStorage {
       db.close();
     }
   }
+
   public void insertLog(Long timestamp, LogLevel level, String message) {
+    this.insertLog(timestamp, level, message, null);
+  }
+
+  public void insertLog(Long timestamp, LogLevel level, String message, String tag) {
 
     if (level == null || level == LogLevel.UNKNOWN) {
       return;
@@ -90,6 +126,7 @@ public class SQLiteLogStorage {
     stmt.bindLong(INSERT_LOG_TIMESTAMP_INDEX, timestamp);
     stmt.bindLong(INSERT_LOG_LEVEL_INDEX, level.getCode());
     stmt.bindString(INSERT_LOG_MESSAGE_INDEX, message);
+    stmt.bindString(INSERT_LOG_TAG_INDEX, tag);
 
     try {
       db.beginTransaction();
@@ -104,7 +141,8 @@ public class SQLiteLogStorage {
       stmt.close();
     }
   }
-  public List<LogEvent> getLogs(Long start, Long end, Integer limit, Integer level, String order, Integer explicitLevel) {
+
+  public List<LogEvent> getLogs(Long start, Long end, Integer limit, Integer level, List<String> tags, String order, Integer explicitLevel) {
 
     List<LogEvent> resultList = new ArrayList<>();
 
@@ -130,8 +168,12 @@ public class SQLiteLogStorage {
             selection.add(SQLQuery.SELECTION_LEVEL_EQ);
         } else {
             selection.add(SQLQuery.SELECTION_LEVEL_GTE);
-        }     
+        }
         selectionArgs.add(String.valueOf(level));
+      }
+
+      if (tags != null && tags.size() > 0) {
+        selection.add(" tag IN (" + tags.stream().collect(Collectors.joining("\", \"", "\"", "\"")) + ") ");
       }
 
       String limitParam = limit == null ? null : String.valueOf(limit);
@@ -152,11 +194,13 @@ public class SQLiteLogStorage {
       }
 
       while (cursor.moveToNext()) {
+        Log.d(TAG, "+ cursor:" + cursor.getString(GET_LOGS_TAG_INDEX));
         resultList.add(new LogEvent(
           cursor.getLong(GET_LOGS_ID_INDEX),
           cursor.getLong(GET_LOGS_TIMESTAMP_INDEX),
           LogLevel.fromCode(cursor.getInt(GET_LOGS_LEVEL_INDEX)),
-          cursor.getString(GET_LOGS_MESSAGE_INDEX)
+          cursor.getString(GET_LOGS_MESSAGE_INDEX),
+          cursor.getString(GET_LOGS_TAG_INDEX)
         ));
       }
 
