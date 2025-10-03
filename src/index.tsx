@@ -78,6 +78,7 @@ function isLogOptions(obj: any): obj is LogOptions {
 class SQLiteLoggerImpl {
   private _logLevel = LogLevel.Debug;
   private _formatter = defaultFormatter;
+  private _defaultTag = 'main';
   private _originalConsole: {
 		debug: typeof console.debug;
 		log: typeof console.log;
@@ -114,6 +115,20 @@ class SQLiteLoggerImpl {
     }
   }
 
+  setDefaultTag(t:string) {
+    this._defaultTag = t;
+  }
+
+  handleLogOp(type: 'debug'|'info'|'warn'|'error', ...args: any[]) {
+      if (isLogOptions(args[0])) {
+        this[type](util.format(...args.slice(1)), args[0].tag);
+        this._originalConsole?.[type](...args.slice(1));
+      } else {
+        this[type](util.format(...args), this._defaultTag);
+        this._originalConsole?.[type](...args);
+      }
+  }
+
   enableConsoleCapture() {
     // Store original console methods
  	this._originalConsole = {
@@ -126,53 +141,23 @@ class SQLiteLoggerImpl {
  
     // Override console methods
     console.debug = (...args: any[]) => {
-      if (isLogOptions(args[0])) {
-        this.debug(util.format(...args.slice(1)), args[0].tag);
-        this._originalConsole?.debug(...args.slice(1));
-      } else {
-        this.debug(util.format(...args));
-        this._originalConsole?.debug(...args);
-      }
+      this.handleLogOp('debug', ...args);
     };
  
     console.log = (...args: any[]) => {
-      if (isLogOptions(args[0])) {
-        this.info(util.format(...args.slice(1)), args[0].tag);
-        this._originalConsole?.log(...args.slice(1));
-      } else {
-        this.info(util.format(...args));
-        this._originalConsole?.log(...args);
-      }
+      this.handleLogOp('info', ...args);
     };
  
     console.info = (...args: any[]) => {
-      if (isLogOptions(args[0])) {
-        this.info(util.format(...args.slice(1)), args[0].tag);
-        this._originalConsole?.info(...args.slice(1));
-      } else {
-        this.info(util.format(...args));
-        this._originalConsole?.info(...args);
-      }
+      this.handleLogOp('info', ...args);
     };
  
     console.warn = (...args: any[]) => {
-      if (isLogOptions(args[0])) {
-        this.warn(util.format(...args.slice(1)), args[0].tag);
-        this._originalConsole?.warn(...args.slice(1));
-      } else {
-        this.warn(util.format(...args));
-        this._originalConsole?.warn(...args);
-      }
+      this.handleLogOp('warn', ...args);
     };
  
     console.error = (...args: any[]) => {
-      if (isLogOptions(args[0])) {
-        this.error(util.format(...args.slice(1)), args[0].tag);
-        this._originalConsole?.error(...args.slice(1));
-      } else {
-        this.error(util.format(...args));
-        this._originalConsole?.error(...args);
-      }
+      this.handleLogOp('error', ...args);
     };
   }
 
