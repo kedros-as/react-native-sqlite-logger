@@ -129,22 +129,23 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void write(double level, String str) {
+  public void write(double level, String str, String tag) {
+    final Logger l = LoggerFactory.getLogger((tag == null) ? "main" : tag);
     switch (LogLevel.fromCode((int) level)) {
       case TRACE:
-        logger.trace(str);
+        l.trace(str);
         break;
       case DEBUG:
-        logger.debug(str);
+        l.debug(str);
         break;
       case INFO:
-        logger.info(str);
+        l.info(str);
         break;
       case WARN:
-        logger.warn(str);
+        l.warn(str);
         break;
       case ERROR:
-        logger.error(str);
+        l.error(str);
         break;
     }
   }
@@ -194,6 +195,7 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
     result.putDouble("timestamp", (double) logEvent.getTimestamp());
     result.putInt("level", logEvent.getLevel().getCode());
     result.putString("message", logEvent.getMessage());
+    result.putString("tag", logEvent.getTag());
 
     return result;
   }
@@ -206,9 +208,16 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
         Long end = options.hasKey("end") ? (long) options.getDouble("end") : null;
         Integer limit = options.hasKey("limit") ? options.getInt("limit") : null;
         Integer level = options.hasKey("level") ? options.getInt("level") : null;
+        ReadableArray tagsArray = options.hasKey("tags") ? options.getArray("tags") : null;
         String order = options.hasKey("order") ? options.getString("order") : null;
         Integer explicitLevel = options.hasKey("explicitLevel") ? options.getInt("explicitLevel") : 1;
-        List<LogEvent> logs = this.sqLiteAppender.getLogStorage().getLogs(start, end, limit, level, order, explicitLevel);
+
+        List<String> tagsList = new ArrayList<>();
+        if (tagsArray != null) {
+          for (int i = 0; i < tagsArray.size(); i++) tagsList.add(tagsArray.getString(i));
+        }
+
+        List<LogEvent> logs = this.sqLiteAppender.getLogStorage().getLogs(start, end, limit, level, tagsList, order, explicitLevel);
 
         WritableArray result = Arguments.createArray();
         for (LogEvent log : logs) {

@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 import { StyleSheet, Text, View } from 'react-native';
-import { SQLiteLogger } from 'react-native-sqlite-logger';
+import { /*LogLevel,*/ SQLiteLogger } from 'react-native-sqlite-logger';
 
 export default function App() {
   const [result, setResult] = React.useState<string | undefined>('<empty>');
@@ -20,12 +20,14 @@ export default function App() {
         // console.info('Example INFO message');
         SQLiteLogger.debug('Example DEBUG message');
         SQLiteLogger.info('Example INFO message');
+        
+        console.info({tag:'MyTag'}, 'Example INFO msg with TAG');
 
         // Fetch at most 20 oldest logs
-
         const resultList = await SQLiteLogger.getLogs({
           order: 'asc',
           limit: 20,
+          tags: ["MyTag", "main"]
         });
 
         setResult(JSON.stringify(resultList));

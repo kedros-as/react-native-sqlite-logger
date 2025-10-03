@@ -43,22 +43,27 @@ RCT_EXPORT_METHOD(configure:(NSDictionary*)options resolver:(RCTPromiseResolveBl
     resolve(nil);
 }
 
-RCT_EXPORT_METHOD(write:(NSNumber* _Nonnull)level str:(NSString*)str) {
+RCT_EXPORT_METHOD(write:(NSNumber* _Nonnull)level str:(NSString*)str tag:(NSString*)tag) {
     switch (level.integerValue) {
         case LOG_LEVEL_VERBOSE:
-            DDLogVerbose(@"%@", str);
+            //DDLogVerbose(@"%@", str);
+            LOG_MAYBE(LOG_ASYNC_ENABLED, LOG_LEVEL_DEF, DDLogFlagVerbose, 0, tag, __PRETTY_FUNCTION__, @"%@", str);
             break;
         case LOG_LEVEL_DEBUG:
-            DDLogDebug(@"%@", str);
+            //DDLogDebug(@"%@", str);
+            LOG_MAYBE(LOG_ASYNC_ENABLED, LOG_LEVEL_DEF, DDLogFlagDebug,   0, tag, __PRETTY_FUNCTION__, @"%@", str);
             break;
         case LOG_LEVEL_INFO:
-            DDLogInfo(@"%@", str);
+            //DDLogInfo(@"%@", str);
+            LOG_MAYBE(LOG_ASYNC_ENABLED, LOG_LEVEL_DEF, DDLogFlagInfo,    0, tag, __PRETTY_FUNCTION__, @"%@", str);
             break;
         case LOG_LEVEL_WARNING:
-            DDLogWarn(@"%@", str);
+            //DDLogWarn(@"%@", str);
+            LOG_MAYBE(LOG_ASYNC_ENABLED, LOG_LEVEL_DEF, DDLogFlagWarning, 0, tag, __PRETTY_FUNCTION__, @"%@", str);
             break;
         case LOG_LEVEL_ERROR:
-            DDLogError(@"%@", str);
+            //DDLogError(@"%@", str);
+            LOG_MAYBE(NO, LOG_LEVEL_DEF, DDLogFlagError,   0, tag, __PRETTY_FUNCTION__, @"%@", str);
             break;
     }
 }
@@ -69,9 +74,10 @@ RCT_EXPORT_METHOD(getLogs:(NSDictionary*)options resolver:(RCTPromiseResolveBloc
     NSNumber* level = options[@"level"];
     NSNumber* limit = options[@"limit"];
     NSString* order = options[@"order"];
-    NSNumber* explicitLevel = options[@"explicitLevel"]
+    NSArray* tags = options[@"tags"];
+    NSNumber* explicitLevel = options[@"explicitLevel"];
 
-    NSArray* result = [self.sqliteLogger getLogs:start end:end level:level limit:limit order:order explicitLevel:explicitLevel];
+    NSArray* result = [self.sqliteLogger getLogs:start end:end level:level tags:tags limit:limit order:order explicitLevel:explicitLevel];
     resolve(result);
 }
 

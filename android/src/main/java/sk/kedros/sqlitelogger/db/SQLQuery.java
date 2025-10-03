@@ -20,12 +20,13 @@ abstract class SQLQuery {
 
   public static final String CREATE_DB_INDEX = "CREATE INDEX IF NOT EXISTS i_log_timestamp ON logs (timestamp);";
 
-  public static final String INSERT_EVENT = "INSERT INTO logs (timestamp, level, message) VALUES (?, ?, ?)";
+  public static final String INSERT_EVENT = "INSERT INTO logs (timestamp, level, message, tag) VALUES (?, ?, ?, ?)";
 
-  public static final String[] QUERY_GET_LOGS_COLUMNS = new String[] {"log_id", "timestamp", "level", "message"};
+  public static final String[] QUERY_GET_LOGS_COLUMNS = new String[] {"log_id", "timestamp", "level", "message", "tag"};
 
   public static final String SELECTION_ID_LTE = "log_id <= ?";
   public static final String SELECTION_LEVEL_EQ = "level = ?";
+  public static final String SELECTION_TAG_EQ = "tag = ?";
   public static final String SELECTION_LEVEL_GTE = "level >= ?";
   public static final String SELECTION_TIMESTAMP_GTE = "timestamp >= ?";
   public static final String SELECTION_TIMESTAMP_LTE = "timestamp <= ?";

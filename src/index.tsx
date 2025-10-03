@@ -31,6 +31,7 @@ export interface LogEvent {
   timestamp: number;
   level: LogLevel;
   message: string;
+  tag: string | null;
 }
 
 export type LogFormatter = (level: LogLevel, msg: string) => string;
@@ -64,6 +65,14 @@ export interface ConfigureOptions {
    * Maximal age of the logs to preserve in seconds.
    **/
   maxAge?: number;
+}
+
+export interface LogOptions {
+  tag: string | undefined;
+}
+
+function isLogOptions(obj: any): obj is LogOptions {
+  return obj && typeof obj === 'object' && 'tag' in obj;
 }
 
 class SQLiteLoggerImpl {
@@ -117,28 +126,53 @@ class SQLiteLoggerImpl {
  
     // Override console methods
     console.debug = (...args: any[]) => {
-      this.debug(util.format(...args));
-      this._originalConsole?.debug(...args);
+      if (isLogOptions(args[0])) {
+        this.debug(util.format(...args.slice(1)), args[0].tag);
+        this._originalConsole?.debug(...args.slice(1));
+      } else {
+        this.debug(util.format(...args));
+        this._originalConsole?.debug(...args);
+      }
     };
  
     console.log = (...args: any[]) => {
-      this.info(util.format(...args));
-      this._originalConsole?.log(...args);
+      if (isLogOptions(args[0])) {
+        this.info(util.format(...args.slice(1)), args[0].tag);
+        this._originalConsole?.log(...args.slice(1));
+      } else {
+        this.info(util.format(...args));
+        this._originalConsole?.log(...args);
+      }
     };
  
     console.info = (...args: any[]) => {
-      this.info(util.format(...args));
-      this._originalConsole?.info(...args);
+      if (isLogOptions(args[0])) {
+        this.info(util.format(...args.slice(1)), args[0].tag);
+        this._originalConsole?.info(...args.slice(1));
+      } else {
+        this.info(util.format(...args));
+        this._originalConsole?.info(...args);
+      }
     };
  
     console.warn = (...args: any[]) => {
-      this.warn(util.format(...args));
-      this._originalConsole?.warn(...args);
+      if (isLogOptions(args[0])) {
+        this.warn(util.format(...args.slice(1)), args[0].tag);
+        this._originalConsole?.warn(...args.slice(1));
+      } else {
+        this.warn(util.format(...args));
+        this._originalConsole?.warn(...args);
+      }
     };
  
     console.error = (...args: any[]) => {
-      this.error(util.format(...args));
-      this._originalConsole?.error(...args);
+      if (isLogOptions(args[0])) {
+        this.error(util.format(...args.slice(1)), args[0].tag);
+        this._originalConsole?.error(...args.slice(1));
+      } else {
+        this.error(util.format(...args));
+        this._originalConsole?.error(...args);
+      }
     };
   }
 
@@ -166,6 +200,7 @@ class SQLiteLoggerImpl {
     start?: number;
     end?: number;
     level?: LogLevel;
+    tags?: string[];
     limit?: number;
     order?: 'asc' | 'desc';
     explicitLevel?: boolean;
@@ -188,29 +223,29 @@ class SQLiteLoggerImpl {
     return RNSqliteLogger.getDbFilePath();
   }
 
-  trace(msg: string) {
-    this.write(LogLevel.Trace, msg);
+  trace(msg: string, tag?: string) {
+    this.write(LogLevel.Trace, msg, tag);
   }
 
-  debug(msg: string) {
-    this.write(LogLevel.Debug, msg);
+  debug(msg: string, tag?: string) {
+    this.write(LogLevel.Debug, msg, tag);
   }
 
-  info(msg: string) {
-    this.write(LogLevel.Info, msg);
+  info(msg: string, tag?: string) {
+    this.write(LogLevel.Info, msg, tag);
   }
 
-  warn(msg: string) {
-    this.write(LogLevel.Warning, msg);
+  warn(msg: string, tag?: string) {
+    this.write(LogLevel.Warning, msg, tag);
   }
 
-  error(msg: string) {
-    this.write(LogLevel.Error, msg);
+  error(msg: string, tag?: string) {
+    this.write(LogLevel.Error, msg, tag);
   }
 
-  write(level: LogLevel, msg: string) {
+  write(level: LogLevel, msg: string, tag?: string) {
     if (this._logLevel <= level) {
-      RNSqliteLogger.write(level, this._formatter(level, msg));
+      RNSqliteLogger.write(level, this._formatter(level, msg), tag);
     }
   }
 
