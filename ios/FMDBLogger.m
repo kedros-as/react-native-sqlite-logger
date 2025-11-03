@@ -440,7 +440,7 @@
         [args addObject:level];
     }
 
-    if (tags != nil && [tags count] != 0) {
+    if (tags != nil && tags != [NSNull null] && [tags count] != 0) {
         NSMutableArray *quoted = [NSMutableArray arrayWithCapacity:tags.count];
         for (NSString *s in tags) {
             [quoted addObject:[NSString stringWithFormat:@"'%@'", s]];
