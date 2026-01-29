@@ -37,10 +37,16 @@
 {
     if ((self = [super init]))
     {
+        id obj = logMessage->_representedObject;
+        
+        // Check whether to override tag value
+        BOOL isValid = [obj isKindOfClass:[NSString class]] && 
+                       ([obj length] >= 10 || [obj isEqualToString:@"main"]);
+
         level     = @(logMessage->_flag);
         message   = logMessage->_message;
         timestamp = logMessage->_timestamp;
-        tag       = logMessage->_representedObject;
+        tag       = isValid ? obj : @"main";
     }
     return self;
 }
@@ -432,7 +438,7 @@
     }
 
     if (level) {
-        if (explicitLevel) {
+        if ([explicitLevel boolValue]) {
             [whereArray addObject:@"level = ?"];
         } else {
             [whereArray addObject:@"level >= ?"];
@@ -453,6 +459,9 @@
     NSString *orderClause = order && [order compare:@"desc" options: NSCaseInsensitiveSearch] == NSOrderedSame ? @" ORDER BY timestamp DESC" : @" ORDER BY timestamp ASC";
     NSString *limitClause = limit ? [NSString stringWithFormat:@" LIMIT %@", limit] : @"";
     NSString *query = [NSString stringWithFormat:@"SELECT * FROM logs%@%@%@", whereClause, orderClause, limitClause];
+
+    //NSLog(@"SQL: %@", query);
+    //NSLog(@"args:%@", args);
 
     NSMutableArray *resultList = [[NSMutableArray alloc] init];
 
