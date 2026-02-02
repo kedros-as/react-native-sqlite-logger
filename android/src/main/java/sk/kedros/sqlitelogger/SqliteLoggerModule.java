@@ -129,6 +129,11 @@ public class SqliteLoggerModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
+  public void setTagOverride(String tag, Promise promise) {
+    promise.resolve(false);
+  }
+
+  @ReactMethod
   public void write(double level, String str, String tag) {
     final Logger l = LoggerFactory.getLogger((tag == null) ? "main" : tag);
     switch (LogLevel.fromCode((int) level)) {

@@ -28,6 +28,10 @@ RCT_EXPORT_METHOD(configure:(NSDictionary*)options resolver:(RCTPromiseResolveBl
     NSNumber *maxAge = options[@"maxAge"] ? : @(60 * 60 * 24 * 5); // default 5 days
     NSNumber *queueSize = options[@"queueSize"] ? : @(500); // default 500 items
     NSNumber *saveInterval = options[@"saveInterval"] ? : @(10); // default 10 seconds
+
+    NSString *tagRegex = options[@"tagRegex"] ? : nil;
+    NSString *tagOverride = options[@"tagOverride"] ? : nil;
+
     FMDBLogger *sqliteLogger = [[FMDBLogger alloc] initWithLogDirectory:logFileDir logFileName:logFileName];
 
     sqliteLogger.saveThreshold     = [queueSize doubleValue];
@@ -35,6 +39,9 @@ RCT_EXPORT_METHOD(configure:(NSDictionary*)options resolver:(RCTPromiseResolveBl
     sqliteLogger.maxAge            = [maxAge doubleValue];
     sqliteLogger.deleteInterval    = [deleteInterval doubleValue];
     sqliteLogger.deleteOnEverySave = NO;
+
+    if (tagRegex) [sqliteLogger setTagRegex:tagRegex];
+    if (tagOverride) [sqliteLogger setTagOverride:tagOverride]; 
 
     [DDLog removeAllLoggers];
     self.sqliteLogger = sqliteLogger;
@@ -93,6 +100,11 @@ RCT_EXPORT_METHOD(deleteLogs:(NSDictionary*)options resolver:(RCTPromiseResolveB
 RCT_EXPORT_METHOD(getDbFilePath:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
     NSString *path = [self.sqliteLogger getDbFilePath];
     resolve(path);
+}
+
+RCT_EXPORT_METHOD(setTagOverride:(NSString*)tagStr resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject) {
+    [self.sqliteLogger setTagOverride:tagStr];
+    resolve(nil);
 }
 
 @end
