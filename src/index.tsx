@@ -65,6 +65,16 @@ export interface ConfigureOptions {
    * Maximal age of the logs to preserve in seconds.
    **/
   maxAge?: number;
+  /**
+   * Log message tag filtering regex - conforming (iOS only)
+   * default: '^(\\d{10,}|main)$' - 10+ digits numeric string or "main"
+   */
+  tagRegex?: string;
+  /**
+   * Log message tag default override (iOS only)
+   * default: "main"
+   */
+  tagOverride?: string;
 }
 
 export interface LogOptions {
@@ -117,6 +127,10 @@ class SQLiteLoggerImpl {
 
   setDefaultTag(t:string) {
     this._defaultTag = t;
+    // on iOS propagate this also to native code
+    if (Platform.OS === 'ios') {
+      RNSqliteLogger.setTagOverride(t);
+    }
   }
 
   handleLogOp(type: 'debug'|'info'|'warn'|'error', ...args: any[]) {
@@ -179,6 +193,10 @@ class SQLiteLoggerImpl {
 
   getLogLevel(): LogLevel {
     return this._logLevel;
+  }
+
+  setTagOverride(tag: string) {
+    return RNSqliteLogger.setTagOverride(tag);
   }
 
   getLogs(options: {

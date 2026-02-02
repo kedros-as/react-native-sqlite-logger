@@ -23,7 +23,7 @@
     NSString * tag;
 }
 
-- (id)initWithLogMessage:(DDLogMessage *)logMessage;
+- (id)initWithLogMessage:(DDLogMessage *)logMessage overrideTag:(NSString*)tagOverride;
 
 @end
 
@@ -33,20 +33,14 @@
 
 @implementation FMDBLogEntry
 
-- (id)initWithLogMessage:(DDLogMessage *)logMessage
+- (id)initWithLogMessage:(DDLogMessage *)logMessage overrideTag:(NSString*)tagOverride
 {
     if ((self = [super init]))
     {
-        id obj = logMessage->_representedObject;
-        
-        // Check whether to override tag value
-        BOOL isValid = [obj isKindOfClass:[NSString class]] && 
-                       ([obj length] >= 10 || [obj isEqualToString:@"main"]);
-
         level     = @(logMessage->_flag);
         message   = logMessage->_message;
         timestamp = logMessage->_timestamp;
-        tag       = isValid ? obj : @"main";
+        tag       = tagOverride ? tagOverride : logMessage->_representedObject;
     }
     return self;
 }
@@ -70,6 +64,10 @@
 
         [self validateLogDirectory];
         [self openDatabase];
+        
+        // init default tag override
+        [self setTagRegex:@"^(\\d{10,}|main)$"];
+        [self setTagOverride:@"main"];
     }
 
     return self;
@@ -225,6 +223,33 @@
   [database setShouldCacheStatements:YES];
 }
 
+- (BOOL)setTagRegex:(NSString*)regexStr
+{
+    if (!regexStr) {
+        tagRegex = nil;
+        return NO;
+    }
+
+    if ([regexStr length] > 0) {
+        NSError *error = nil;
+        tagRegex = [NSRegularExpression regularExpressionWithPattern:regexStr options:0 error:&error];
+
+        if (!tagRegex) {
+            NSLog(@"Regex Error: %@", [error localizedDescription]);
+            return NO;
+        }
+
+        return YES;
+    } 
+
+    return NO;
+}
+
+- (void)setTagOverride:(NSString*)tagStr
+{
+    tagOverride = tagStr;    
+}
+
 #pragma mark AbstractDatabaseLogger Overrides
 
 - (BOOL)db_log:(DDLogMessage *)logMessage
@@ -251,7 +276,20 @@
     // is greatly reduced.
 
     if (logMessage && [logMessage->_message length] != 0) {
-        FMDBLogEntry *logEntry = [[FMDBLogEntry alloc] initWithLogMessage:logMessage];
+
+        NSString* replaceTag = nil;
+        if (!logMessage->_representedObject || [logMessage->_representedObject length] == 0) {
+            replaceTag = tagOverride;
+        } else if (tagRegex) {
+            NSTextCheckingResult *match = [tagRegex firstMatchInString:logMessage->_representedObject 
+                                                           options:0 
+                                                             range:NSMakeRange(0, [logMessage->_representedObject length])];
+            if (!match) {
+                replaceTag = tagOverride;
+            }
+        }
+
+        FMDBLogEntry *logEntry = [[FMDBLogEntry alloc] initWithLogMessage:logMessage overrideTag:replaceTag];
         @synchronized(pendingLogEntries) {
             [pendingLogEntries addObject:logEntry];
         }

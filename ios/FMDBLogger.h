@@ -24,6 +24,10 @@ typedef enum LogLevel {
     NSString *_logFileName;
     NSMutableArray *pendingLogEntries;
 
+    // tag override support
+    NSRegularExpression *tagRegex;
+    NSString *tagOverride;
+
     FMDatabase *database;
 }
 
@@ -35,6 +39,11 @@ typedef enum LogLevel {
 - (BOOL)deleteLogs:(NSNumber*)start end:(NSNumber*)end maxId:(NSNumber*)maxId;
 - (NSArray*)getLogs:(NSNumber*)start end:(NSNumber*)end level:(NSNumber*)level tags:(NSArray*)tags limit:(NSNumber*)limit order:(NSString*)order explicitLevel:(NSNumber*)explicitLevel;
 - (NSString*)getDbFilePath;
+
+// tag filtering regex to compile
+- (BOOL)setTagRegex:(NSString*)regexStr;
+// current tag override
+- (void)setTagOverride:(NSString*)tagStr;
 
 //
 // This class inherits from DDAbstractDatabaseLogger.
